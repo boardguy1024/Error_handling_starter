@@ -99,7 +99,7 @@ class ViewController: UIViewController {
                 }, onError: { [weak self] e in
                     guard let strongSelf = self else { return }
                     DispatchQueue.main.async {
-                        InfoView.showIn(viewController: strongSelf, message: "An error occurred")
+                        strongSelf.showError(error: e)
                     }
                 })
 //                .retryWhen { e in
@@ -156,6 +156,20 @@ class ViewController: UIViewController {
         running.drive(cityNameLabel.rx.isHidden).disposed(by:bag)
         
     }
+    
+    func showError(error e: Error) {
+        if let e = e as? ApiController.ApiError {
+            switch e {
+            case .cityNotFound:
+                InfoView.showIn(viewController: self, message: "City Name is invalid")
+            case .serverFailure:
+                InfoView.showIn(viewController: self, message: "Server error")
+            }
+        } else {
+            InfoView.showIn(viewController: self, message: "An error occurred")
+        }
+    }
+    
     
     override func viewDidAppear(_ animated: Bool) {
         super.viewDidAppear(animated)
