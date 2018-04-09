@@ -89,14 +89,30 @@ class ViewController: UIViewController {
         //                .catchErrorJustReturn(ApiController.Weather.empty)
         //        }
         
+        let maxAttempts = 4
         let textSearch = searchInput.flatMap { text in
             return ApiController.shared.currentWeather(city: text ?? "Error")
                 .do(onNext: { data in //正常なデータをcacheする （なんらかのエラー時にcacheを使うため）
                     if let text = text {
                         self.cache[text] = data
                     }
+                }, onError: { [weak self] e in
+                    guard let strongSelf = self else { return }
+                    DispatchQueue.main.async {
+                        InfoView.showIn(viewController: strongSelf, message: "An error occurred")
+                    }
                 })
-                .retry(3)
+//                .retryWhen { e in
+//                    e.enumerated().flatMap { (attempt, error) -> Observable<Int> in
+//
+//                        print("=== retrying after \(attempt + 1) seconds ==")
+//
+//                        if attempt >= maxAttempts - 1 {
+//                            return Observable.error(error)
+//                        }
+//                        return Observable<Int>.timer(Double(attempt + 1), scheduler: MainScheduler.instance).take(1)
+//                    }
+//                }
                 .catchError { error in
                     if let text = text, let cachedData = self.cache[text] {
                         return Observable.just(cachedData)
