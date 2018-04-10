@@ -90,6 +90,24 @@ class ViewController: UIViewController {
         //        }
         
         let maxAttempts = 4
+        
+        let retryHandler: (Observable<Error>) -> Observable<Int> = { e in
+            return e.enumerated().flatMap { (attempt, error) -> Observable<Int> in
+                
+                if attempt >= maxAttempts - 1 {
+                    return Observable.error(error)
+                } else if let casted = error as? ApiController.ApiError, casted == .invalidKey {
+                    return ApiController.shared.apiKey
+                        .filter { $0 != ""}
+                        .map { _ in return 1 }
+                }
+                print("== retrying after \(attempt + 1) seconds ==")
+                return Observable<Int>.timer(Double(attempt + 1), scheduler: MainScheduler.instance).take(1)
+            }
+        }
+        
+        
+        
         let textSearch = searchInput.flatMap { text in
             return ApiController.shared.currentWeather(city: text ?? "Error")
                 .do(onNext: { data in //正常なデータをcacheする （なんらかのエラー時にcacheを使うため）
@@ -102,17 +120,7 @@ class ViewController: UIViewController {
                         strongSelf.showError(error: e)
                     }
                 })
-//                .retryWhen { e in
-//                    e.enumerated().flatMap { (attempt, error) -> Observable<Int> in
-//
-//                        print("=== retrying after \(attempt + 1) seconds ==")
-//
-//                        if attempt >= maxAttempts - 1 {
-//                            return Observable.error(error)
-//                        }
-//                        return Observable<Int>.timer(Double(attempt + 1), scheduler: MainScheduler.instance).take(1)
-//                    }
-//                }
+                .retryWhen(retryHandler)
                 .catchError { error in
                     if let text = text, let cachedData = self.cache[text] {
                         return Observable.just(cachedData)
@@ -164,6 +172,8 @@ class ViewController: UIViewController {
                 InfoView.showIn(viewController: self, message: "City Name is invalid")
             case .serverFailure:
                 InfoView.showIn(viewController: self, message: "Server error")
+            case .invalidKey:
+                InfoView.showIn(viewController: self, message: "Key is invalid")
             }
         } else {
             InfoView.showIn(viewController: self, message: "An error occurred")
